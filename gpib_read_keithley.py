@@ -25,11 +25,11 @@ class VoltageRange:
 
 # Class to interface with the Keithley 182
 class Keithley182:
-    def __init__(self, inst=None):
+    def __init__(self, inst=None, gpib_port_num=None):
         if inst is not None:
             self._inst = inst
         else:
-            self._inst = self.find_instrument()
+            self._inst = self.find_instrument(gpib_port_num)
         if self._inst is None:
             raise Exception("No Keithley 182 found")
         self._inst.timeout = 2000
@@ -51,15 +51,24 @@ class Keithley182:
         assert 1 <= length <= 1024, "Invalid buffer length"
         self._inst.write(f'I1,{length}X')
 
-    def find_instrument(self):
+    def find_instrument(self, gpib_port_num=None):
         rm = pyvisa.ResourceManager(r"C:\Windows\system32\visa64.dll")
         resources = rm.list_resources()
 
         for name in resources:
             if 'GPIB' in name:
                 print(f"Opening {name}")
-                inst = rm.open_resource(name)
-                return inst
+                # expect name to be in format GPIB0::xx::INSTR
+                # if gpib_port_num is not specified, return the first instrument found
+                # else, return the instrument with the specified gpib_port_num
+                if gpib_port_num is not None:
+                    if f'{gpib_port_num}' in name:
+                        inst = rm.open_resource(name)
+                        return inst
+                else:
+                    inst = rm.open_resource(name)
+                    return inst
+                return None
         return None
 
     def set_range(self, range):
@@ -106,7 +115,7 @@ class Keithley182:
 
 
 if __name__ == '__main__':
-    nanovoltmeter = Keithley182()
+    nanovoltmeter = Keithley182(15)
     # nanovoltmeter.set_range(VoltageRange.RANGE_3V)
     nanovoltmeter.manual_trigger()
     print(nanovoltmeter.read_single())
